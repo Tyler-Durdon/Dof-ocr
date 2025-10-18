@@ -204,3 +204,17 @@ def set_region():
     global HOTEL_DES_VENTES_REGION
     HOTEL_DES_VENTES_REGION = select_region()
     return HOTEL_DES_VENTES_REGION
+
+
+def draw_zones(image, zones):
+    """
+    Dessine les cadres de chaque zone sur l'image.
+    Couleurs : hdv=blue, categories=green, bois=yellow, ressources=red
+    """
+    draw = ImageDraw.Draw(image)
+    colors = ["blue", "green", "yellow", "red"]
+    for zone, color in zip(zones, colors):
+        left, top, width, height = zone
+        right = left + width
+        bottom = top + height
+        draw.rectangle([left, top, right, bottom], outline=color, width=3)
