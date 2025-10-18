@@ -18,7 +18,7 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tessera
 HOTEL_DES_VENTES_REGION = None
 # HOTEL_DES_VENTES_REGION = (100, 100, 800, 600)  # (left, top, width, height)
 
-# Charge le modèle TrOCR pour texte imprimé (printed)
+# Charge TrOCR
 processor = TrOCRProcessor.from_pretrained(
     "microsoft/trocr-base-printed", use_fast=True)
 model = VisionEncoderDecoderModel.from_pretrained(
@@ -46,11 +46,24 @@ def extract_text(image):
     # Convertit l'image PIL en RGB
     if image.mode != "RGB":
         image = image.convert("RGB")
-    # Prépare l'image pour TrOCR
-    pixel_values = processor(images=image, return_tensors="pt").pixel_values
-    generated_ids = model.generate(pixel_values)
-    text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-    return text
+    # Essaye TrOCR d'abord
+    try:
+        pixel_values = processor(
+            images=image, return_tensors="pt").pixel_values
+        generated_ids = model.generate(pixel_values)
+        text = processor.batch_decode(
+            generated_ids, skip_special_tokens=True)[0]
+        if text and len(text.strip()) > 3:
+            return text
+    except Exception as e:
+        print(f"Erreur TrOCR: {e}")
+    # Fallback pytesseract en français
+    try:
+        text = pytesseract.image_to_string(image, lang='fra')
+        return text
+    except Exception as e:
+        print(f"Erreur pytesseract: {e}")
+        return ""
 
 
 def detect_hdv(text):

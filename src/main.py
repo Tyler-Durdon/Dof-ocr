@@ -34,6 +34,9 @@ def main():
 
         img = capture_screen(region)
         text = extract_text(img)
+        print("\n--- Texte OCR détecté ---")
+        print(text)
+        print("--- Fin texte OCR ---\n")
         hdv_detected = detect_hdv_fuzzy(text)
         bois_checked = detect_categorie_bois(text) if hdv_detected else False
 
