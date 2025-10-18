@@ -4,6 +4,10 @@ import pytesseract
 from PIL import Image, ImageDraw
 import pyautogui
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+import difflib
+import tkinter as tk
+from tkinter import simpledialog
+import unicodedata
 
 # Configure le chemin de Tesseract pour Windows
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -52,6 +56,27 @@ def extract_text(image):
 def detect_hdv(text):
     # Recherche "Hôtel de vente" (sans 's')
     return "hôtel de vente" in text.lower()
+
+
+def remove_accents(input_str):
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', input_str)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+
+def detect_hdv_fuzzy(text, threshold=0.7):
+    """
+    Détecte 'Hotel de vente' même si le texte OCR n'est pas exact, sans accent.
+    """
+    target = "hotel de vente"
+    lines = text.lower().split('\n')
+    for line in lines:
+        line_no_acc = remove_accents(line.strip())
+        ratio = difflib.SequenceMatcher(None, line_no_acc, target).ratio()
+        if ratio >= threshold:
+            return True
+    return False
 
 
 def detect_categorie_bois(text):
@@ -103,3 +128,66 @@ def save_resources(resources, path="json/bois_resources.json"):
 def show_target_region():
     # Affiche le cadre rouge sur la région ciblée
     capture_screen(HOTEL_DES_VENTES_REGION, show_box=True)
+
+
+def select_region():
+    """
+    Affiche une fenêtre transparente permettant à l'utilisateur de sélectionner une région à l'écran.
+    Retourne (left, top, width, height)
+    """
+    root = tk.Tk()
+    root.attributes('-fullscreen', True)
+    root.attributes('-alpha', 0.3)
+    root.attributes('-topmost', True)
+    root.config(cursor="crosshair")
+    root.title("Sélectionnez la région à analyser (cadre jaune)")
+
+    canvas = tk.Canvas(root, cursor="crosshair", bg="black")
+    canvas.pack(fill=tk.BOTH, expand=True)
+
+    region = {}
+
+    def on_mouse_down(event):
+        region['x1'] = event.x
+        region['y1'] = event.y
+        region['rect'] = canvas.create_rectangle(
+            event.x, event.y, event.x, event.y, outline='yellow', width=3)
+
+    def on_mouse_drag(event):
+        canvas.coords(region['rect'], region['x1'],
+                      region['y1'], event.x, event.y)
+
+    def on_mouse_up(event):
+        region['x2'] = event.x
+        region['y2'] = event.y
+        root.quit()
+
+    canvas.bind("<ButtonPress-1>", on_mouse_down)
+    canvas.bind("<B1-Motion>", on_mouse_drag)
+    canvas.bind("<ButtonRelease-1>", on_mouse_up)
+
+    root.mainloop()
+    root.destroy()
+
+    x1, y1, x2, y2 = region['x1'], region['y1'], region['x2'], region['y2']
+    left = min(x1, x2)
+    top = min(y1, y2)
+    width = abs(x2 - x1)
+    height = abs(y2 - y1)
+    return (left, top, width, height)
+
+
+def get_or_select_region():
+    global HOTEL_DES_VENTES_REGION
+    if HOTEL_DES_VENTES_REGION is None:
+        HOTEL_DES_VENTES_REGION = select_region()
+    return HOTEL_DES_VENTES_REGION
+
+
+def set_region():
+    """
+    Permet de redéfinir la région à analyser via la sélection utilisateur.
+    """
+    global HOTEL_DES_VENTES_REGION
+    HOTEL_DES_VENTES_REGION = select_region()
+    return HOTEL_DES_VENTES_REGION
